@@ -118,7 +118,7 @@ Constraints=[Constraints,(zeros(T,Nw) <= Pwind <= Windmax):'wind power output li
 %-------------------------------- tie line --------------------------------
 for t=1:T
     Constraints=[Constraints,(-TieMax <= ftie(t,:) <= TieMax):'tieline_max'];
-    Constraints=[Constraints,(Ftie(t,:) == ftie(t,:)*Tie_Area):'tieline_sum'];
+    Constraints=[Constraints,(Ftie(t,:) == ftie(t,:)*ftie_Ftie):'tieline_sum'];
 end
 %------------------------------- exchange power -----------------------------
 for t=1:T
@@ -132,8 +132,8 @@ for td=1:TD
 end
 %------------------------------- power balance ----------------------------
 for t=1:T
-    Constraints=[Constraints,(sum(Pg(t,:))+Pwind(t)...
-        ==Demand(t)+sum(Ftie(t,:))):'power balance'];
+    Constraints=[Constraints,(sum(Pg(t,:))+sum(Pwind(t,:))...
+        == sum(Demand(t,:))+sum(Ftie(t,:))):'power balance'];
 end
 %------------------------------- spinning reserve -------------------------
 % for t=1:T
@@ -155,36 +155,44 @@ end
 
 %% Objective
 % minLang=[];
-% minLang= sum(sum(Windmax-Pwind));
+ThermalCost=0;
+WindCur = sum(sum(Windmax - Pwind));
+for t=1:T
+    ThermalCost= ThermalCost + Pg(t,:)*diag(CostA)*Pg(t,:)'+CostB*Pg(t,:)';
+end
+minLang = ThermalCost+gamma*WindCur;
+
 %     for la=1:Ntie
 %         minLang = minLang +...
 %             lamda(:,la)'*(ftie(:,la)-ftieAvg(:,la))+...
 %             Rho/2*(ftie(:,la)-ftieAvg(:,la))'*(ftie(:,la)-ftieAvg(:,la));                
 %     end
 %% solver
-Ops = sdpsettings('solver','gurobi','usex0',1,'verbose',0,'showprogress',0);
+Ops = sdpsettings('solver','gurobi','usex0',1,'verbose',1,'showprogress',0);
 Ops.gurobi.MIPGap=0.0002;
 %         Ops.gurobi.MIPGapAbs=1.0;
 Ops.gurobi.OptimalityTol = 0.0002;
 %         Ops.gurobi.FeasRelaxBigM   = 1.0e10;
 Ops.gurobi.DisplayInterval = 20;
-diag = optimize(Constraints,[],Ops); 
+diagnose = optimize(Constraints,minLang,Ops); 
 % check(Constraints);
-if diag.problem ~= 0
-    error(yalmiperror(diag.problem));
+if diagnose.problem ~= 0
+    error(yalmiperror(diagnose.problem));
 end
 %% read values of variables
-% %%--------------------------- wind power & PV -----------------------------
-% Pwind_V=value(Pwind);    %% output of wind power 
-% Ppv_V  =value(Ppv);      %% output of PV 
-% %%--------------------------- thermal unit --------------------------------
-% Pg_V= value(Pg);
-% onoff_V=value(onoff);
-% startup_V  = value(startup);
-% shutdown_V = value( shutdown);
-% %%---------------------------- tie lines ----------------------------------
-% Ftie_V = value( Ftie);
-% minLang_V=value(minLang);
+%%--------------------------- wind power & PV -----------------------------
+Pwind_V=value(Pwind);    %% output of wind power 
+%%--------------------------- thermal unit --------------------------------
+Pg_V= value(Pg);
+onoff_V=value(onoff);
+startup_V  = value(startup);
+shutdown_V = value( shutdown);
+%%---------------------------- tie lines ----------------------------------
+ftie_V = value(ftie);
+Ftie_V = value( Ftie);
+minLang_V=value(minLang);
+ThermalCost_V = value(ThermalCost);
+WindCur_V = value(WindCur);
 % %% return out
 % out.Pwind    = Pwind_V;
 % out.Ppv      = Ppv_V;
