@@ -60,12 +60,14 @@ line_Bus    = xlsread(xlsxFile,2,['B2:C' num2str(Nl+1)])';             %% 2xNl
 H           = getPTDF(Nb, line_Bus, lineX, slack);                 %% NlxNb    power transmission distribution factor
 
 %%----------------------------- 联络线 ------------------------------------
-Tie_Bus     = xlsread(xlsxFile,6,['B2:B' num2str(Ntie+1)])';           %% 1xNtie    
-TieArea     = xlsread(xlsxFile,6,['C2:C' num2str(Ntie+1)])';           %% 1xNtie    connnected area
-TieBus      = xlsread(xlsxFile,6,['D2:D' num2str(Ntie+1)])';             %% 1xNtie    connected bus
+Tie_Bus     = xlsread(xlsxFile,6,['B2:B' num2str(Ntie+1)])';           %% 1xNtie    connected bus itself area
+TieArea     = xlsread(xlsxFile,6,['C2:C' num2str(Ntie+1)])';           %% 1xNtie    connnected area #
+TieBus      = xlsread(xlsxFile,6,['D2:D' num2str(Ntie+1)])';             %% 1xNtie    connected bus in neighbor area
 TieMax      = xlsread(xlsxFile,6,['E2:E' num2str(Ntie+1)])';             %% 1xNtie    transmission capacity
 Tie_map     = zeros(Ntie,Nb);             %% NtiexNb   map(i,j)= 1 if tieline i connnected at bus j; 0 else
-
+for g=1:Ntie
+    Tie_map(g,Tie_Bus(g)) = 1;
+end
 %%--------------------------- 联络线计划 -----------------------------------
 FtieArea    = xlsread(xlsxFile,7,['B2:B' num2str(Narea+1)])';           %% 1xNarea    connected area
 FtieMax     = xlsread(xlsxFile,7,['C2:C' num2str(Narea+1)])';             %% 1xNarea    max
@@ -75,10 +77,8 @@ FtieRD      = xlsread(xlsxFile,7,['F2:F' num2str(Narea+1)])';             %% 1xN
 FtieEgy     = xlsread(xlsxFile,7,['G2:G' num2str(Narea+1)])';              %% TDxNarea    energy constraint
 ftie_Ftie   = zeros(Ntie,Narea);          %% NtiexNarea  (i,j)=  1 if tie i connnected area j; 0 else
 for g=1:Ntie
-    Tie_map(g,Tie_Bus(g)) = 1;
     ftie_Ftie(g, find(FtieArea==TieArea(g))) = 1;
 end
-
 %%----------------------------- 备用 --------------------------------------
 ReserveUp   = xlsread(xlsxFile,8,'B1:Y1')';          %% up reserve
 ReserveDn   = xlsread(xlsxFile,8,'B2:Y2')';         %% dowen reserve
