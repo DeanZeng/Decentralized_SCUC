@@ -1,6 +1,10 @@
-function out = scuc_modelSolve(model)
+function [out,ftie_out] = scuc_modelSolve(model,ftie_avg,lamda,Rho)
+%% objective
+model.Objective = model.Objective +...
+    sum(sum(lamda.*(model.Variable.ftie-ftie_avg)))+...
+    sum(sum(Rho*0.5*(model.Variable.ftie-ftie_avg).*(model.Variable.ftie-ftie_avg)));
 %% solve
-Ops = sdpsettings('solver','gurobi','usex0',1,'verbose',1,'showprogress',0);
+Ops = sdpsettings('solver','gurobi','usex0',1,'verbose',0,'showprogress',0);
 Ops.gurobi.MIPGap=0.0002;
 %         Ops.gurobi.MIPGapAbs=1.0;
 Ops.gurobi.OptimalityTol = 0.0002;
@@ -25,3 +29,4 @@ out.Ftie = value(model.Variable.Ftie);
 out.Objective =value(model.Objective);
 out.ThermalCost = value(model.Variable.ThermalCost);
 out.WindCur = value(model.Variable.WindCur);
+ftie_out = value(model.Variable.ftie);
