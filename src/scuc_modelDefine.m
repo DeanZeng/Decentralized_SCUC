@@ -164,21 +164,3 @@ for t=1:T
     model.Variable.ThermalCost= model.Variable.ThermalCost + model.Variable.Pg(t,:)*diag(CostA)*model.Variable.Pg(t,:)'+CostB*model.Variable.Pg(t,:)';
 end
 model.Objective = model.Variable.ThermalCost+gamma*model.Variable.WindCur;
-
-%     for la=1:Ntie
-%         minLang = minLang +...
-%             lamda(:,la)'*(model.Variable.ftie(:,la)-model.Variable.ftieAvg(:,la))+...
-%             Rho/2*(model.Variable.ftie(:,la)-model.Variable.ftieAvg(:,la))'*(model.Variable.ftie(:,la)-model.Variable.ftieAvg(:,la));                
-%     end
-
-% Ops = sdpsettings('solver','gurobi','usex0',1,'verbose',1,'showprogress',0);
-% Ops.gurobi.MIPGap=0.0002;
-% %         Ops.gurobi.MIPGapAbs=1.0;
-% Ops.gurobi.OptimalityTol = 0.0002;
-% %         Ops.gurobi.FeasRelaxBigM   = 1.0e10;
-% Ops.gurobi.DisplayInterval = 20;
-% diagnose = optimize(model.Constraints,model.Objective,Ops); 
-% % check(Constraints);
-% if diagnose.problem ~= 0
-%     error(yalmiperror(diagnose.problem));
-% end
