@@ -11,12 +11,31 @@ ftie_outC= cell(A,1);
 ftie_avgC= cell(A,1);
 
 QUIET    = false;
-MAX_ITER = 100;
-epsP     = 1;
-epsD     = 1e-1;
-Rho      = 0.001;
+MAX_ITER = 400;
+epsP     = 1e-3;
+epsD     = 1e-3;
+ABSTOL   = 1;
+RELTOL   = 1e-2;
+Rho      = 1;
 alpha    = 1;
 % parpool(A);
+%-------------- plot
+figure(1)
+ax11 = subplot(3,1,1);
+hold on
+ax12 = subplot(3,1,2);
+hold on
+ax13 = subplot(3,1,3);
+hold on
+figure(2)
+ax21 = subplot(2,1,1);
+ax22 = subplot(2,1,2);
+figure(3)
+ax31 = subplot(2,1,1);
+hold on
+ax32 = subplot(2,1,2);
+hold on
+%-------------- plot
 tic;
 spmd
         % load data in work;
@@ -70,6 +89,7 @@ for k= 1:MAX_ITER
             ftie_avgC{a}(:,la) = 0.5*(ftie_outC{a}(:,la)-ftie_outC{b}(:,lb));
         end
     end
+    %%--------------------------- y update --------------------------------
     spmd
         ftie_avg_old = ftie_avg;
         % fetch z
@@ -77,9 +97,34 @@ for k= 1:MAX_ITER
         % update y
         lamda = lamda + Rho*(ftie_out - ftie_avg);
         resP  = (ftie_out - ftie_avg);
-        resD  = Rho*(ftie_avg-ftie_avg_old);   
-        quiet = (all(all(resP <= epsP)))&&(all(all(resD <= epsD)));
+        resD  = -Rho*(ftie_avg-ftie_avg_old);   
+%         quiet = (all(all(abs(resP) <= epsP)))&&(all(all(abs(resD) <=
+%         epsD)));     %¾ø¶ÔÎó²î
+        quiet = (all(all(abs(resP) <= ABSTOL + abs(RELTOL.*ftie_avg))))&&(all(all(abs(resD) <= ABSTOL + abs(RELTOL.*lamda)))); %Ïà¶ÔÎó²î
     end
+    %-------------- plot
+    for a=1:A
+        resPC{a} = resP{a};
+        resDC{a} = resD{a};
+        lamdaC{a}= lamda{a};
+    end
+    figure(1)
+    plot(ax11, ftie_avgC{1});
+    plot(ax12, ftie_outC{1});
+    plot(ax13, -ftie_outC{2});
+    figure(2)
+    plot(ax21, resPC{1});
+    hold on
+    plot(ax21, ABSTOL + abs(RELTOL.*ftie_avgC{1}));
+    hold off
+    plot(ax22, resDC{1});
+    hold on
+    plot(ax22, ABSTOL + abs(RELTOL.*lamdaC{1}));
+    hold off
+    figure(3)
+    plot(ax31, lamdaC{1});
+    plot(ax32, lamdaC{2});
+    %-------------- plot
     QUIET = true;
     for a=1:A
         QUIET = QUIET && quiet{a};
