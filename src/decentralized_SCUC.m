@@ -16,7 +16,7 @@ epsP     = 1e-3;
 epsD     = 1e-3;
 ABSTOL   = 1;
 RELTOL   = 1e-2;
-Rho      = 1;
+Rho      = 10;
 alpha    = 1;
 % parpool(A);
 %-------------- plot
