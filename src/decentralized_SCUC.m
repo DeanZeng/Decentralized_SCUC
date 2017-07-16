@@ -1,5 +1,6 @@
 %%multi-area decentralized SCUC
 matFile = {'data\testcase\areadata1.mat', 'data\testcase\areadata2.mat'};
+resultFile ='data\testcase\result.mat';
 A=2;       % number of area 
 T=24;
 
@@ -39,6 +40,7 @@ ax32 = subplot(2,1,2);
 hold on
 %-------------- plot
 tic;
+%% ADMM algorithm
 spmd
         % load data in work;
         scuc_in = load(matFile{labindex});
@@ -106,8 +108,8 @@ for k= 1:MAX_ITER
     end
     %-------------- plot
     for a=1:A
-        resPC{a} = resP{a};
-        resDC{a} = resD{a};
+        resPC{a}(:,:,k) = resP{a};
+        resDC{a}(:,:,k) = resD{a};
         lamdaC{a}= lamda{a};
     end
     figure(1)
@@ -115,11 +117,11 @@ for k= 1:MAX_ITER
     plot(ax12, ftie_outC{1});
     plot(ax13, -ftie_outC{2});
     figure(2)
-    plot(ax21, abs(resPC{1}));
+    plot(ax21, abs(resPC{1}(:,:,k)));
     hold(ax21, 'on')
     plot(ax21, ABSTOL + abs(RELTOL.*ftie_avgC{1}));
     hold(ax21, 'off')
-    plot(ax22, abs(resDC{1}));
+    plot(ax22, abs(resDC{1}(:,:,k)));
     hold on
     plot(ax22, ABSTOL + abs(RELTOL.*lamdaC{1}));
     hold off
@@ -136,5 +138,20 @@ for k= 1:MAX_ITER
     end
     k
     toc;
+end
+%% save results
+if QUIET
+    disp( 'Successfully solved');
+    for a=1:A
+        scuc_outC{a}=scuc_out{labindex};
+    end
+elseif k > MAX_ITER
+    disp( 'Maximum iterations exceeded');
+end
+save(resultFile ,scuc_outC);
+%% display error
+isPlot = true;
+if isPlot
+    
 end
 % delete(gcp());
