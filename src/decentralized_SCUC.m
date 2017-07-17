@@ -10,7 +10,7 @@ TieBusC  = cell(A,1);
 Tie_BusC = cell(A,1);
 ftie_outC= cell(A,1);
 ftie_avgC= cell(A,1);
-
+%-------------- admm struct -----------------------
 admm.Converge = false;
 admm.MAX_ITER = 400;
 admm.Iteration=0;
@@ -19,11 +19,16 @@ admm.RELTOL   = 1e-2;
 admm.Rho      = 10;
 admm.Solvetime=0;
 admm.Problem = 'not start';
-alpha    = 1;
+%-------------- admm struct -----------------------
+
 epsP     = 1e-3;
 epsD     = 1e-3;
+%------------- accelerate method ------------------
+accelerate_mode = false;
+insens_times = 2;                  %% 机组状态变化不灵敏判断次数 >=2
+%------------- accelerate method ------------------
 % parpool(A);
-%-------------- plot
+%-------------- plot -------------------
 figure(1)
 ax11 = subplot(3,1,1);
 hold on
@@ -41,7 +46,7 @@ ax31 = subplot(2,1,1);
 hold on
 ax32 = subplot(2,1,2);
 hold on
-%-------------- plot
+%-------------- plot ------------------
 tic;
 QUIET = admm.Converge;
 MAX_ITER = admm.MAX_ITER;
@@ -65,6 +70,13 @@ spmd
         Tie_Bus  = scuc_in.Tie_Bus;
         % scuc model define in local work;
         scuc_model = scuc_modelDefine(scuc_in); 
+        % insensitive units initialization in accelerate mode
+        if accelerate_mode == true 
+            iu.onoff_old = zeros(scuc_in.T,scuc_in.Ng);  % 机组上次迭代状态 
+            iu.invar_times = zeros(1,scuc_in.Ng);        % 机组状态不变次数
+            iu.fix_units = zeros(1,scuc_in.Ng);          % 状态固定机组 0-没有固定， 1-固定，未加入约束， 2-固定，已加入约束 
+            iu.insens_times = insens_times;                 % 机组状态变化不灵敏判断次数 >=2
+        end
 end
 for a=1:A
     NtieC{a}     = Ntie{a};
@@ -77,15 +89,29 @@ end
 for k= 1:MAX_ITER
     admm.Iteration = k;
     if k==1
-        spmd
-            %%--------------------------- x update -------------------------------
-            [scuc_out,ftie_out] = scuc_modelSolve(scuc_model,ftie_avg,lamda,0);   
+        if accelerate_mode == true 
+            spmd
+                %%--------------------------- x update -------------------------------
+                [scuc_out,ftie_out,iu] = scuc_accelerateSolve(scuc_model,ftie_avg,lamda,0,iu);   
+            end
+        else
+            spmd
+                %%--------------------------- x update -------------------------------
+                [scuc_out,ftie_out] = scuc_modelSolve(scuc_model,ftie_avg,lamda,0);   
+            end
         end
     else 
-        spmd
-            %%--------------------------- x update -------------------------------
-            [scuc_out,ftie_out] = scuc_modelSolve(scuc_model,ftie_avg,lamda,Rho);   
-        end
+        if accelerate_mode == true 
+            spmd
+                %%--------------------------- x update -------------------------------
+                [scuc_out,ftie_out,iu] = scuc_accelerateSolve(scuc_model,ftie_avg,lamda,Rho,iu);   
+            end
+        else 
+            spmd
+                %%--------------------------- x update -------------------------------
+                [scuc_out,ftie_out] = scuc_modelSolve(scuc_model,ftie_avg,lamda,Rho);   
+            end
+        end 
     end
     %%--------------------------- z update --------------------------------
     % fetch x
