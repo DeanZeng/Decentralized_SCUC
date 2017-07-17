@@ -1,12 +1,9 @@
 function [out,ftie_out,iu] = scuc_accelerateSolve(model,ftie_avg,lamda,Rho,iu)
 %% insensitive unit struct
-iu.onoff_old;       % 机组上次迭代状态 
-iu.invar_times;     % 机组状态不变次数
-iu.fix_units;       % 状态固定机组
-iu.insens_times;     % 
-% iu.onoff_old = zeros(scuc_in.T,scuc_in.Ng);  % 机组上次迭代状态 
-% iu.invar_times = zeros(1,scuc_in.Ng);        % 机组状态不变次数
-% iu.fix_units = false(1,scuc_in.Ng);          % 状态固定机组
+% % iu.onoff_old   TxNg    % 机组上次迭代状态 
+% % iu.invar_times 1xNg;   % 机组状态不变次数
+% % iu.fix_units   1xNg;   % 状态固定机组 0-没有固定， 1-固定，未加入约束， 2-固定，已加入约束 
+% % iu.insens_times;       % 机组状态变化不灵敏判断次数 >=2
 [T,Ng] = size(iu.onoff_old);
 %% fix unit status
 for g =1:Ng
@@ -49,13 +46,13 @@ ftie_out = value(model.Variable.ftie);
 %% update onoff_old, invar_times
 for g =1:Ng
     if iu.fix_units(g)== 0
-        if all(out.onoff(:,g) == iu.onoff_old(:,g))
+        if all(round(out.onoff(:,g)) == round(iu.onoff_old(:,g)))
             iu.invar_times(g) = iu.invar_times(g)+1;
             if iu.invar_times(g) >= iu.insens_times
                 iu.fix_units(g) = 1;
             end
         else
-            iu.onoff_old(:,g) = out.onoff(:,g);
+            iu.onoff_old(:,g) = round(out.onoff(:,g));
             iu.invar_times(g) = 1;
         end
     end
