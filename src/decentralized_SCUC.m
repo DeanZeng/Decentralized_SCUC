@@ -11,14 +11,17 @@ Tie_BusC = cell(A,1);
 ftie_outC= cell(A,1);
 ftie_avgC= cell(A,1);
 
-QUIET    = false;
-MAX_ITER = 400;
+admm.Converge = false;
+admm.MAX_ITER = 400;
+admm.Iteration=0;
+admm.ABSTOL   = 1;
+admm.RELTOL   = 1e-2;
+admm.Rho      = 10;
+admm.Solvetime=0;
+admm.Problem = 'not start';
+alpha    = 1;
 epsP     = 1e-3;
 epsD     = 1e-3;
-ABSTOL   = 1;
-RELTOL   = 1e-2;
-Rho      = 10;
-alpha    = 1;
 % parpool(A);
 %-------------- plot
 figure(1)
@@ -40,6 +43,11 @@ ax32 = subplot(2,1,2);
 hold on
 %-------------- plot
 tic;
+QUIET = admm.Converge;
+MAX_ITER = admm.MAX_ITER;
+ABSTOL = admm.ABSTOL;
+RELTOL = admm.RELTOL;
+Rho = admm.Rho;
 %% ADMM algorithm
 spmd
         % load data in work;
@@ -67,6 +75,7 @@ for a=1:A
     ftie_avgC{a} = ftie_avg{a};
 end
 for k= 1:MAX_ITER
+    admm.Iteration = k;
     if k==1
         spmd
             %%--------------------------- x update -------------------------------
@@ -135,20 +144,23 @@ for k= 1:MAX_ITER
     end
     if QUIET
         break;
-    end
-    k
+    end  
     toc;
 end
+admm.Solvetime = toc;
+admm.Converge = QUIET;
 %% save results
-if QUIET
+if admm.Converge
+    admm.Problem = 'Successfully solved';
     disp( 'Successfully solved');
     for a=1:A
         scuc_outC{a}=scuc_out{labindex};
     end
-elseif k > MAX_ITER
+elseif admm.Iteration >= admm.MAX_ITER
+    admm.Problem = 'Maximum iterations exceeded';
     disp( 'Maximum iterations exceeded');
 end
-save(resultFile ,scuc_outC);
+save(resultFile ,'scuc_outC');
 %% display error
 isPlot = true;
 if isPlot
