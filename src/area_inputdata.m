@@ -1,7 +1,7 @@
 %area_inputData
 clear all;
-xlsxFile ='data\case24\areadata2.xlsx';
-matFile = 'data\case24\areadata2.mat';
+xlsxFile ='data\case24\areadata1.xlsx';
+matFile = 'data\case24\areadata1.mat';
 noarea      = xlsread(xlsxFile,1,'B1:B1')';                %% area #
 T           = xlsread(xlsxFile,1,'B2:B2')';               %% time horizons
 TD          = xlsread(xlsxFile,1,'B3:B3')';
@@ -11,11 +11,12 @@ Ntie        = xlsread(xlsxFile,1,'B6:B6')';                %% number of tie line
 Narea       = xlsread(xlsxFile,1,'B7:B7')';                %% number of neighbor areas
 Nw          = xlsread(xlsxFile,1,'B8:B8')';                %% number of wind farms
 Nd          = xlsread(xlsxFile,1,'B9:B9')';                %% number of demand buses
-Nb          = xlsread(xlsxFile,1,'B10:B10')';                %% number of buses
-Nl          = xlsread(xlsxFile,1,'B11:B11')';                %% number of lines  
-slack       = xlsread(xlsxFile,1,'B12:B12')';                %% slack bus
+Nb          = xlsread(xlsxFile,1,'B10:B10')';              %% number of buses
+Nl          = xlsread(xlsxFile,1,'B11:B11')';              %% number of lines  
+slack       = xlsread(xlsxFile,1,'B12:B12')';              %% slack bus
+B           = xlsread(xlsxFile,1,'B13:B13')';              %% number of blocks
 %%----------------------------- 惩罚因子 ----------------------------------
-gamma       = xlsread(xlsxFile,1,'B13:B13')';                %% wind curtailment penalty coefficient
+gamma       = xlsread(xlsxFile,1,'B14:B14')';                %% wind curtailment penalty coefficient
 %%------------------------ 机组  ---------------------------------
 Pmax        = xlsread(xlsxFile,3,['C2:C' num2str(Ng+1)])';            %% 1xNg    unit maximum output   
 Pmin        = xlsread(xlsxFile,3,['D2:D' num2str(Ng+1)])';            %% 1xNg    unit minimum output
@@ -32,7 +33,8 @@ CostB       = xlsread(xlsxFile,3,['N2:N' num2str(Ng+1)])';            %% 1xNg   
 CostC       = xlsread(xlsxFile,3,['O2:O' num2str(Ng+1)])';            %% 1xNg    cost coefficient
 CostUp      = xlsread(xlsxFile,3,['P2:P' num2str(Ng+1)])';            %% 1xNg    startup cost
 CostDn      = xlsread(xlsxFile,3,['Q2:Q' num2str(Ng+1)])';            %% 1xNg    shut-down cost
-Gen_Bus     = xlsread(xlsxFile,3,['B2:B' num2str(Ng+1)])';      
+Gen_Bus     = xlsread(xlsxFile,3,['B2:B' num2str(Ng+1)])'; 
+[Kb,Pbmax,C0]  = pwCostFunc(Pmin,Pmax,CostA,CostB,CostC,B);
 %
 G_map=zeros(Ng,Nb);
 for g=1:Ng
