@@ -1,13 +1,16 @@
-function [out,ftie_out] = scuc_modelSolve(model,ftie_avg,lamda,Rho)
+function [out,ftie_out] = scuc_modelSolve(model,ftie_avg,lamda,Rho,MIPGap)
+if nargin <= 4
+    MIPGap = 0.005;
+end
 %% objective
 model.Objective = model.Objective +...
     sum(sum(lamda.*(model.Variable.ftie-ftie_avg)))+...
     sum(sum(Rho*0.5*(model.Variable.ftie-ftie_avg).*(model.Variable.ftie-ftie_avg)));
 %% solve
-Ops = sdpsettings('solver','gurobi','usex0',1,'verbose',0,'showprogress',0);
-Ops.gurobi.MIPGap=0.0002;
+Ops = sdpsettings('solver','gurobi','usex0',1,'verbose',1,'showprogress',0);
+Ops.gurobi.MIPGap=MIPGap;
 %         Ops.gurobi.MIPGapAbs=1.0;
-Ops.gurobi.OptimalityTol = 0.0002;
+Ops.gurobi.OptimalityTol = 0.01;
 %         Ops.gurobi.FeasRelaxBigM   = 1.0e10;
 Ops.gurobi.DisplayInterval = 20;
 diagnose = optimize(model.Constraints,model.Objective,Ops); 
@@ -19,8 +22,9 @@ end
 %%--------------------------- wind power & PV -----------------------------
 out.Pwind= value(model.Variable.Pwind);    %% output of wind power 
 %%--------------------------- thermal unit --------------------------------
-out.Pg=  value(model.Variable.Pg);
-out.onoff= value(model.Variable.onoff);
+out.Pg  = value(model.Variable.Pg);
+out.Pgb = value(model.Variable.Pgb);
+out.onoff = value(model.Variable.onoff);
 out.startup  = value(model.Variable.startup);
 out.shutdown = value(model.Variable.shutdown);
 %%---------------------------- tie lines ----------------------------------

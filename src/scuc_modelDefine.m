@@ -11,6 +11,7 @@ Nd          = in.Nd;                %% number of demand buses
 Nb          = in.Nb;                %% number of buses
 Nl          = in.Nl;                %% number of lines
 slack       = in.slack;
+B           = in.B;
 %%------------------------ initialization ---------------------------------
 Pmax        = in.Pmax;              %% 1xNg    unit maximum output   
 Pmin        = in.Pmin;              %% 1xNg    unit minimum output
@@ -26,6 +27,9 @@ CostA       = in.CostA;             %% 1xNg    cost coefficient
 CostB       = in.CostB;             %% 1xNg    cost coefficient
 CostC       = in.CostC;             %% 1xNg    cost coefficient
 G_map       = in.G_map;             %% NgxNb   map(i,j)= 1 if generator i at bus j; 0 else  
+Kb          = in.Kb;                %% BxNg    slope of piecewise linear cost function
+Pbmax       = in.Pbmax;             %% BxNg    (b,g): maximum output of the bth block for unit g
+C0          = in.C0;                %% 1xNg    cost at Pmin
 %%----------------------------- ¸ººÉ --------------------------------------
 Demand      = in.Demand;            %% TxNd    demand  
 D_map       = in.D_map;             %% NdxNb   map(i,j)= 1 if demand i at bus j; 0 else   
@@ -62,7 +66,8 @@ gamma = in.gamma;
 model.Variable.Pwind=sdpvar(T,Nw,'full');      %% output of wind power 
 
 %%--------------------------- thermal unit --------------------------------
-model.Variable.Pg = sdpvar(T,Ng,'full');   %% output of thermal unit
+% model.Variable.Pg = sdpvar(T,Ng,'full');   %% output of thermal unit
+model.Variable.Pgb = sdpvar(T,Ng,B,'full'); %% output of block
 model.Variable.onoff    = binvar(T,Ng,'full');   %% on_off status;
 model.Variable.startup  = binvar(T,Ng,'full');   %% start up indicator
 model.Variable.shutdown = binvar(T,Ng,'full');   %% shut down indicator
@@ -86,13 +91,15 @@ model.Constraints=[model.Constraints,(model.Variable.startup-model.Variable.shut
 model.Constraints=[model.Constraints,(model.Variable.startup+model.Variable.shutdown<=ones(T,Ng)):'logical_2'];
 % output limit
 for t = 1:T
-   model.Constraints = [model.Constraints, (model.Variable.onoff(t,:).*Pmin <=...
-       model.Variable.Pg(t,:) <= model.Variable.onoff(t,:).*Pmax):'output limit'];
+%    model.Constraints = [model.Constraints, (model.Variable.onoff(t,:).*Pmin <=...
+%        model.Variable.Pg(t,:) <= model.Variable.onoff(t,:).*Pmax):'output limit'];
+    model.Variable.Pg(t,:) = model.Variable.onoff(t,:).*Pmin +  sum(model.Variable.Pgb(t,:,:),3);
+    for g=1:Ng
+        for b=1:B
+            model.Constraints = [model.Constraints, (0 <= model.Variable.Pgb(t,g,b) <= Pbmax(b,g)*model.Variable.onoff(t,g) ):'output limit'];
+        end
+    end
 end
-%     for t = 1:T
-%        model.Constraints{a} = [model.Constraints{a}, (Pmin{a} <=...
-%            Pg{a}(t,:) <= Pmax{a}):'output limit'];
-%     end
 % minimum up/down time
 Lini=On_t0+Off_t0;
 for t=1:Lini
@@ -158,9 +165,15 @@ end
 
 %% Objective
 % minLang=[];
+model.Objective= [];
 model.Variable.ThermalCost=0;
 model.Variable.WindCur = sum(sum(Windmax - model.Variable.Pwind));
 for t=1:T
-    model.Variable.ThermalCost= model.Variable.ThermalCost + model.Variable.Pg(t,:)*diag(CostA)*model.Variable.Pg(t,:)'+CostB*model.Variable.Pg(t,:)';
+%     model.Variable.ThermalCost= model.Variable.ThermalCost + model.Variable.Pg(t,:)*diag(CostA)*model.Variable.Pg(t,:)'+CostB*model.Variable.Pg(t,:)';
+    for g=1:Ng
+        for b=1:B
+            model.Variable.ThermalCost= model.Variable.ThermalCost + C0(g)*model.Variable.onoff(t,g) + Kb(b,g)*model.Variable.Pgb(t,g,b)';
+        end
+    end
 end
 model.Objective = model.Variable.ThermalCost+gamma*model.Variable.WindCur;
