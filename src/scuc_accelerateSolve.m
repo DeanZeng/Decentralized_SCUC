@@ -18,7 +18,7 @@ model.Objective = model.Objective +...
     sum(sum(Rho*0.5*(model.Variable.ftie-ftie_avg).*(model.Variable.ftie-ftie_avg)));
 %% solve
 Ops = sdpsettings('solver','gurobi','usex0',1,'verbose',0,'showprogress',0);
-Ops.gurobi.MIPGap=0.0002;
+Ops.gurobi.MIPGap=0.005;
 %         Ops.gurobi.MIPGapAbs=1.0;
 Ops.gurobi.OptimalityTol = 0.0002;
 %         Ops.gurobi.FeasRelaxBigM   = 1.0e10;
