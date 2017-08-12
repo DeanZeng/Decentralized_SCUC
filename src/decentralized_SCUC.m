@@ -1,6 +1,6 @@
 %%multi-area decentralized SCUC
-matFile = {'data\testcase\areadata1.mat', 'data\testcase\areadata2.mat'};
-resultFile ='data\testcase\result.mat';
+matFile = {'data\case24\areadata1.mat', 'data\case24\areadata2.mat'};
+resultFile ='data\case24\result.mat';
 A=2;       % number of area 
 T=24;
 
@@ -16,7 +16,10 @@ admm.MAX_ITER = 400;
 admm.Iteration=0;
 admm.ABSTOL   = 1;
 admm.RELTOL   = 1e-2;
-admm.Rho      = 10;
+admm.Rho      = 1;
+admm.penaltyAdjust = 1;    %% 0-不调整惩罚系数Rho， 1-调整惩罚系数
+admm.tau = 2;              %% 惩罚系数调整的相关系数 >1
+admm.mu  = 10;             %% 惩罚系数调整的相关系数 >1   
 admm.Solvetime=0;
 admm.Problem = 'not start';
 %-------------- admm struct -----------------------
@@ -24,31 +27,31 @@ admm.Problem = 'not start';
 epsP     = 1e-3;
 epsD     = 1e-3;
 %------------- accelerate method ------------------
-accelerate_mode = false;
-insens_times = 2;                  %% 机组状态变化不灵敏判断次数 >=2
+accelerate_mode = true;
+insens_times = 4;                  %% 机组状态变化不灵敏判断次数 >=2
+MIPGap       = 0.001;
 %------------- accelerate method ------------------
-% parpool(A);
+parpool(A);
 %-------------- plot -------------------
-figure(1)
-ax11 = subplot(3,1,1);
-hold on
-ax12 = subplot(3,1,2);
-hold on
-ax13 = subplot(3,1,3);
-hold on
-figure(2)
-ax21 = subplot(2,1,1);
-hold on
-ax22 = subplot(2,1,2);
-hold on
-figure(3)
-ax31 = subplot(2,1,1);
-hold on
-ax32 = subplot(2,1,2);
-hold on
+% figure(1)
+% ax11 = subplot(3,1,1);
+% hold on
+% ax12 = subplot(3,1,2);
+% hold on
+% ax13 = subplot(3,1,3);
+% hold on
+% figure(2)
+% ax21 = subplot(2,1,1);
+% hold on
+% ax22 = subplot(2,1,2);
+% hold on
+% figure(3)
+% ax31 = subplot(2,1,1);
+% hold on
+% ax32 = subplot(2,1,2);
+% hold on
 %-------------- plot ------------------
 tic;
-QUIET = admm.Converge;
 MAX_ITER = admm.MAX_ITER;
 ABSTOL = admm.ABSTOL;
 RELTOL = admm.RELTOL;
@@ -88,6 +91,7 @@ for a=1:A
 end
 for k= 1:MAX_ITER
     admm.Iteration = k;
+    MIPGap = 0.005;  % 0.001+0.1./k;   
     if k==1
         if accelerate_mode == true 
             spmd
@@ -97,7 +101,8 @@ for k= 1:MAX_ITER
         else
             spmd
                 %%--------------------------- x update -------------------------------
-                [scuc_out,ftie_out] = scuc_modelSolve(scuc_model,ftie_avg,lamda,0);   
+                
+                [scuc_out,ftie_out] = scuc_modelSolve(scuc_model,ftie_avg,lamda,0,MIPGap);   
             end
         end
     else 
@@ -107,12 +112,15 @@ for k= 1:MAX_ITER
                 [scuc_out,ftie_out,iu] = scuc_accelerateSolve(scuc_model,ftie_avg,lamda,Rho,iu);   
             end
         else 
+            
             spmd
                 %%--------------------------- x update -------------------------------
-                [scuc_out,ftie_out] = scuc_modelSolve(scuc_model,ftie_avg,lamda,Rho);   
+                [scuc_out,ftie_out] = scuc_modelSolve(scuc_model,ftie_avg,lamda,Rho,MIPGap);   
             end
         end 
     end
+%     iuu1=iu{1}
+%     iuu2=iu{2}
     %%--------------------------- z update --------------------------------
     % fetch x
     for a=1:A
@@ -139,49 +147,83 @@ for k= 1:MAX_ITER
         resD  = Rho*(ftie_avg-ftie_avg_old);   
 %         quiet = (all(all(abs(resP) <= epsP)))&&(all(all(abs(resD) <=
 %         epsD)));     %绝对误差
-        quiet = (all(all(abs(resP) <= ABSTOL + abs(RELTOL.*ftie_avg))))&&(all(all(abs(resD) <= ABSTOL + abs(RELTOL.*lamda)))); %相对误差
+%         quiet = (all(all(abs(resP) <= ABSTOL + abs(RELTOL.*ftie_avg))))&&(all(all(abs(resD) <= ABSTOL + abs(RELTOL.*lamda)))); %相对误差
+%-------------------- 矩阵范数 inf ------------------
+%         resPnorm = norm(reshape(resP,inf);
+%         resDnorm = norm(resP,inf); 
+%-------------------- 向量范数 2 ---------------------
+        resPnorm = norm(reshape(resP,[1,scuc_in.T*scuc_in.Ntie]));
+        resDnorm = norm(reshape(resD,[1,scuc_in.T*scuc_in.Ntie])); 
+        epsP  = sqrt(scuc_in.T*scuc_in.Ntie)*ABSTOL + RELTOL*norm(reshape(ftie_avg,[1,scuc_in.T*scuc_in.Ntie]));
+        epsD  = sqrt(scuc_in.T*scuc_in.Ntie)*ABSTOL + RELTOL*norm(reshape(lamda,[1,scuc_in.T*scuc_in.Ntie]));
     end
-    %-------------- plot
+    %-------------- fetch resPnorm, resDnorm, lamda------------
     for a=1:A
-        resPC{a}(:,:,k) = resP{a};
-        resDC{a}(:,:,k) = resD{a};
+        resPnormC(a) = resPnorm{a};
+        resDnormC(a) = resDnorm{a};
+        epsPC(a) = epsP{a};
+        epsDC(a) = epsD{a};
         lamdaC{a}= lamda{a};
     end
-    figure(1)
-    plot(ax11, ftie_avgC{1});
-    plot(ax12, ftie_outC{1});
-    plot(ax13, -ftie_outC{2});
-    figure(2)
-    plot(ax21, abs(resPC{1}(:,:,k)));
-    hold(ax21, 'on')
-    plot(ax21, ABSTOL + abs(RELTOL.*ftie_avgC{1}));
-    hold(ax21, 'off')
-    plot(ax22, abs(resDC{1}(:,:,k)));
-    hold on
-    plot(ax22, ABSTOL + abs(RELTOL.*lamdaC{1}));
-    hold off
-    figure(3)
-    plot(ax31, lamdaC{1});
-    plot(ax32, lamdaC{2});
-    %-------------- plot
-    QUIET = true;
-    for a=1:A
-        QUIET = QUIET && quiet{a};
+    resPnormG(k) = norm(resPnormC);
+    resDnormG(k) = norm(resDnormC);
+    epsPG(k) = norm(epsPC);
+    epsDG(k) = norm(epsDC);
+    %-------------- plot-----------------------------
+%         figure(1)
+%     plot(ax11, ftie_avgC{1}(:,1));
+%     plot(ax12, ftie_outC{1}(:,1));
+%     plot(ax13, -ftie_outC{2}(:,1));
+%     figure(2)
+%     plot(ax21, abs(resPC{1}(:,1,k)));
+%     hold(ax21, 'on')
+%     plot(ax21, ABSTOL + abs(RELTOL.*ftie_avgC{1}(:,1)));
+%     hold(ax21, 'off')
+%     plot(ax22, abs(resDC{1}(:,1,k)));
+%     hold on
+%     plot(ax22, ABSTOL + abs(RELTOL.*lamdaC{1}(:,1)));
+%     hold off
+%     figure(3)
+%     plot(ax31, lamdaC{1}(:,1));
+%     plot(ax32, lamdaC{2}(:,1));
+%     pause(0.1)
+%-------------- convegence criterion ----------
+    if (resPnormG(k) < epsPG(k) && resDnormG(k) <epsDG(k))
+        admm.Converge = true;
+         break;
+    end 
+    %-------------- adjust penalty ---------
+    if admm.penaltyAdjust == 1
+        if resPnormG(k) > admm.mu * resDnormG(k)
+            Rho = Rho * admm.tau;
+        elseif resDnormG(k) > admm.mu * resPnormG(k)
+            Rho = Rho / admm.tau;
+        end
     end
-    if QUIET
-        break;
-    end  
-    toc;
+    disp(['第' num2str(k) '次迭代:' num2str(toc) 's']);
 end
 admm.Solvetime = toc;
-admm.Converge = QUIET;
 %% save results
 if admm.Converge
     admm.Problem = 'Successfully solved';
     disp( 'Successfully solved');
+    %-------------- fetch results --------------------------
     for a=1:A
-        scuc_outC{a}=scuc_out{labindex};
+        scuc_outC{a}=scuc_out{a};
     end
+    %-------------- result table ----------------------------
+    resTb = zeros(A+1,3);
+    rowNames =cell(A+1,1);
+    for a=1:A
+        resTb (a,1) = scuc_outC{a}.ThermalCost;
+        resTb (a,2) = scuc_outC{a}.WindCur;
+        resTb (a,3) = scuc_outC{a}.Objective;
+        rowNames{a} = ['area ' num2str(a)];        
+    end
+    resTb(A+1,:) = sum(resTb(1:A,:));
+    rowNames{A+1} = 'sum';
+    resTb = array2table(resTb,'RowNames',rowNames,'VariableNames',{'coalCost','WindCurtailment','Objective'});
+    resTb
 elseif admm.Iteration >= admm.MAX_ITER
     admm.Problem = 'Maximum iterations exceeded';
     disp( 'Maximum iterations exceeded');
@@ -190,6 +232,12 @@ save(resultFile ,'scuc_outC');
 %% display error
 isPlot = true;
 if isPlot
-    
+    g = figure;
+    subplot(2,1,1);                                                                                                                    
+    semilogy(1:k, max(1e-8, resPnormG), 'k',1:k, epsPG, 'k--',  'LineWidth', 2); 
+    ylabel('||r||_2'); 
+    subplot(2,1,2);                                                                                                                    
+    semilogy(1:k, max(1e-8, resDnormG), 'k',1:k, epsDG, 'k--', 'LineWidth', 2);   
+    ylabel('||s||_2'); xlabel('iter (k)'); 
 end
-% delete(gcp());
+delete(gcp());
