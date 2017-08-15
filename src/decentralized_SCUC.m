@@ -129,7 +129,7 @@ for k= 1:MAX_ITER
     for a=1:A
         for la=1:NtieC{a}
             b  = TieAreaC{a}(la);
-            ab = Tie_BusC{a};
+            ab = Tie_BusC{a}(la);
             bb = TieBusC{a}(la);
             lb = find ( (TieAreaC{b}==a)&(TieBusC{b}==ab)&(Tie_BusC{b}== bb));
             % update z
