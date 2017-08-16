@@ -3,7 +3,7 @@ if nargin <= 4
     MIPGap = 0.005;
 end
 %% objective
-model.Objective = model.Objective +...
+Lagrangian = model.Objective +...
     sum(sum(lamda.*(model.Variable.ftie-ftie_avg)))+...
     sum(sum(Rho*0.5*(model.Variable.ftie-ftie_avg).*(model.Variable.ftie-ftie_avg)));
 %% solve
@@ -13,7 +13,7 @@ Ops.gurobi.MIPGap=MIPGap;
 Ops.gurobi.OptimalityTol = 0.01;
 %         Ops.gurobi.FeasRelaxBigM   = 1.0e10;
 Ops.gurobi.DisplayInterval = 20;
-diagnose = optimize(model.Constraints,model.Objective,Ops); 
+diagnose = optimize(model.Constraints,Lagrangian,Ops); 
 % check(Constraints);
 if diagnose.problem ~= 0
     error(yalmiperror(diagnose.problem));
