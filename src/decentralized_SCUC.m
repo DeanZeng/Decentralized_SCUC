@@ -227,6 +227,9 @@ if admm.Converge
 elseif admm.Iteration >= admm.MAX_ITER
     admm.Problem = 'Maximum iterations exceeded';
     disp( 'Maximum iterations exceeded');
+else
+    admm.Problem = 'Unexpected Iterruption';
+    disp( 'Unexpected Iterruption');
 end
 save(resultFile ,'scuc_outC');
 %% display error
