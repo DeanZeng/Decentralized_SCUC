@@ -1,7 +1,7 @@
 %%multi-area decentralized SCUC
-matFile = {'data\case24\areadata1.mat', 'data\case24\areadata2.mat'};
-resultFile ='data\case24\result.mat';
-A=2;       % number of area 
+matFile = {'data\case118\areadata1.mat', 'data\case118\areadata2.mat','data\case118\areadata3.mat'};
+resultFile ='data\case118\result.mat';
+A=3;       % number of area 
 T=24;
 
 NtieC    = cell(A,1);
