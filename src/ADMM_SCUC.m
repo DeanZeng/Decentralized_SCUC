@@ -1,7 +1,11 @@
 %%multi-area decentralized SCUC
-matFile = {'data\case118\areadata1.mat', 'data\case118\areadata2.mat','data\case118\areadata3.mat'};
-resultFile ='data\case118\result.mat';
-A=3;       % number of area 
+% stopping criterion: infinite-norm of residuals 
+%                     absolut tolerance 
+clear all;
+delete(gcp());
+matFile = {'data\case12\areadata1.mat', 'data\case12\areadata2.mat'};
+resultFile ='data\case12\decentralized_result.mat';
+A=2;       % number of area 
 T=24;
 
 NtieC    = cell(A,1);
@@ -12,24 +16,23 @@ ftie_outC= cell(A,1);
 ftie_avgC= cell(A,1);
 %-------------- admm struct -----------------------
 admm.Converge = false;
-admm.MAX_ITER = 400;
+admm.MAX_ITER = 100;
 admm.Iteration=0;
-admm.ABSTOL   = 1;
+admm.ABSTOL   = 0.05;
 admm.RELTOL   = 1e-2;
-admm.Rho      = 1;
+admm.Rho      = 3.5;
 admm.penaltyAdjust = 1;    %% 0-不调整惩罚系数Rho， 1-调整惩罚系数
 admm.tau = 2;              %% 惩罚系数调整的相关系数 >1
-admm.mu  = 5;             %% 惩罚系数调整的相关系数 >1   
+admm.mu  = 10;             %% 惩罚系数调整的相关系数 >1   
 admm.Solvetime=0;
 admm.Problem = 'not start';
+admm.gamma = 1.618;  %1.618;   %% lamada乘子更新系数 取值范围[0,(1+sqrt(5)/2)]
 %-------------- admm struct -----------------------
 
-epsP     = 1e-3;
-epsD     = 1e-3;
 %------------- accelerate method ------------------
 accelerate_mode = true;
-insens_times = 4;                  %% 机组状态变化不灵敏判断次数 >=2
-MIPGap       = 0.001;
+insens_times = 5;                  %% 机组状态变化不灵敏判断次数 >=2
+MIPGap       = 0.005;
 %------------- accelerate method ------------------
 parpool(A);
 %-------------- plot -------------------
@@ -96,7 +99,7 @@ for k= 1:MAX_ITER
         if accelerate_mode == true 
             spmd
                 %%--------------------------- x update -------------------------------
-                [scuc_out,ftie_out,iu] = scuc_accelerateSolve(scuc_model,ftie_avg,lamda,0,iu);   
+                [scuc_out,ftie_out,iu,scuc_model] = scuc_accelerateSolve(scuc_model,ftie_avg,lamda,0,iu);  
             end
         else
             spmd
@@ -109,7 +112,7 @@ for k= 1:MAX_ITER
         if accelerate_mode == true 
             spmd
                 %%--------------------------- x update -------------------------------
-                [scuc_out,ftie_out,iu] = scuc_accelerateSolve(scuc_model,ftie_avg,lamda,Rho,iu);   
+                [scuc_out,ftie_out,iu,scuc_model] = scuc_accelerateSolve(scuc_model,ftie_avg,lamda,Rho,iu);    
             end
         else 
             
@@ -142,15 +145,9 @@ for k= 1:MAX_ITER
         % fetch z
         ftie_avg = ftie_avgC{labindex};
         % update y
-        lamda = lamda + Rho*(ftie_out - ftie_avg);
+        lamda = lamda + admm.gamma*Rho*(ftie_out - ftie_avg);
         resP  = (ftie_out - ftie_avg);
         resD  = Rho*(ftie_avg-ftie_avg_old);   
-%         quiet = (all(all(abs(resP) <= epsP)))&&(all(all(abs(resD) <=
-%         epsD)));     %绝对误差
-%         quiet = (all(all(abs(resP) <= ABSTOL + abs(RELTOL.*ftie_avg))))&&(all(all(abs(resD) <= ABSTOL + abs(RELTOL.*lamda)))); %相对误差
-%-------------------- 矩阵范数 inf ------------------
-%         resPnorm = norm(reshape(resP,inf);
-%         resDnorm = norm(resP,inf); 
 %-------------------- 向量范数 2 ---------------------
 %         resPnorm = norm(reshape(resP,[1,scuc_in.T*scuc_in.Ntie]));
 %         resDnorm = norm(reshape(resD,[1,scuc_in.T*scuc_in.Ntie])); 
@@ -201,18 +198,40 @@ for k= 1:MAX_ITER
 %-------------- convegence criterion ----------
     if (resPnormG(k) < epsPG(k) && resDnormG(k) <epsDG(k))
         admm.Converge = true;
+%             if accelerate_mode == true 
+%                 spmd
+%                     %%--------------------------- x update -------------------------------
+%                     [scuc_out,iu] = scuc_fixftie_accelerateSolve(scuc_model,ftie_avg,iu); 
+%                 end
+%             else 
+% 
+%                 spmd
+%                     %%--------------------------- x update -------------------------------
+%                     [scuc_out] = scuc_fixftie_modelSolve(scuc_model,ftie_avg);   
+%                 end
+%             end
+         disp(['第' num2str(k) '次迭代:' num2str(toc) 's']);
          break;
     end 
     %-------------- adjust penalty ---------
     if admm.penaltyAdjust == 1
         if resPnormG(k) > admm.mu * resDnormG(k)
-            Rho = Rho * admm.tau;
+            if resDnormG(k) > 1e-6
+                Rho = Rho * (1+log10(resPnormG(k)/resDnormG(k)));
+            else
+                Rho = Rho * admm.tau;
+            end
         elseif resDnormG(k) > admm.mu * resPnormG(k)
-            Rho = Rho / admm.tau;
+            if resPnormG(k) >1e-6
+                Rho = Rho / (1+log10(resDnormG(k)/resPnormG(k)));
+            else
+                Rho = Rho / admm.tau;
+            end
         end
     end
     disp(['第' num2str(k) '次迭代:' num2str(toc) 's']);
 end
+admm.Rho = Rho;
 admm.Solvetime = toc;
 %% save results
 if admm.Converge
@@ -222,6 +241,7 @@ if admm.Converge
     for a=1:A
         scuc_outC{a}=scuc_out{a};
     end
+    save(resultFile ,'scuc_outC','ftie_avgC');
     %-------------- result table ----------------------------
     resTb = zeros(A+1,3);
     rowNames =cell(A+1,1);
@@ -238,17 +258,29 @@ if admm.Converge
 elseif admm.Iteration >= admm.MAX_ITER
     admm.Problem = 'Maximum iterations exceeded';
     disp( 'Maximum iterations exceeded');
+    save(resultFile ,'admm');
+else
+    admm.Problem = 'Unexpected Iterruption';
+    disp( 'Unexpected Iterruption');
+    save(resultFile ,'admm');
 end
-save(resultFile ,'scuc_outC');
 %% display error
 isPlot = true;
 if isPlot
-    g = figure;
+    glog = figure;
     subplot(2,1,1);                                                                                                                    
     semilogy(1:k, max(1e-8, resPnormG), 'k',1:k, epsPG, 'k--',  'LineWidth', 2); 
-    ylabel('||r||_2'); 
+    ylabel('primal residual'); 
     subplot(2,1,2);                                                                                                                    
     semilogy(1:k, max(1e-8, resDnormG), 'k',1:k, epsDG, 'k--', 'LineWidth', 2);   
-    ylabel('||s||_2'); xlabel('iter (k)'); 
+    ylabel('dual residual'); xlabel('iter (k)');
+    
+    g = figure;
+    subplot(2,1,1);                                                                                                                    
+    plot(1:k, max(1e-8, resPnormG), 'k',1:k, epsPG, 'k--',  'LineWidth', 2); 
+    ylabel('primal residual'); 
+    subplot(2,1,2);                                                                                                                    
+    plot(1:k, max(1e-8, resDnormG), 'k',1:k, epsDG, 'k--', 'LineWidth', 2);   
+    ylabel('dual residual'); xlabel('iter (k)');
 end
 delete(gcp());
