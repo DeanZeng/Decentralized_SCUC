@@ -1,4 +1,6 @@
 %%multi-area decentralized SCUC
+% stopping criterion: 2-norm of residuals 
+%                     relative + absolut tolerance 
 matFile = {'data\case118\areadata1.mat', 'data\case118\areadata2.mat','data\case118\areadata3.mat'};
 resultFile ='data\case118\result.mat';
 A=3;       % number of area 
