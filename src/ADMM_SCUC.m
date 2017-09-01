@@ -24,6 +24,7 @@ admm.Rho      = 3.5;
 admm.penaltyAdjust = 1;    %% 0-不调整惩罚系数Rho， 1-调整惩罚系数
 admm.tau = 2;              %% 惩罚系数调整的相关系数 >1
 admm.mu  = 10;             %% 惩罚系数调整的相关系数 >1   
+admm.mu0 =10;
 admm.Solvetime=0;
 admm.Problem = 'not start';
 admm.gamma = 1.618;  %1.618;   %% lamada乘子更新系数 取值范围[0,(1+sqrt(5)/2)]
@@ -31,9 +32,16 @@ admm.gamma = 1.618;  %1.618;   %% lamada乘子更新系数 取值范围[0,(1+sqrt(5)/2)]
 
 %------------- accelerate method ------------------
 accelerate_mode = true;
-insens_times = 5;                  %% 机组状态变化不灵敏判断次数 >=2
+insens_times = 2;                  %% 机组状态变化不灵敏判断次数 >=2
 MIPGap       = 0.005;
 %------------- accelerate method ------------------
+%------------- oscillating handle ------------------
+Osch.start = false;
+Osch.centre = 0;
+Osch.rang = sqrt(20);
+Osch.maxIter = 10;
+Osch.iter = 0;
+%------------- oscillating handle------------------
 parpool(A);
 %-------------- plot -------------------
 % figure(1)
@@ -221,12 +229,35 @@ for k= 1:MAX_ITER
             else
                 Rho = Rho * admm.tau;
             end
+            admm.mu = admm.mu0;
         elseif resDnormG(k) > admm.mu * resPnormG(k)
             if resPnormG(k) >1e-6
                 Rho = Rho / (1+log10(resDnormG(k)/resPnormG(k)));
             else
                 Rho = Rho / admm.tau;
             end
+            admm.mu = admm.mu0;
+        end
+        if resPnormG(k) < 10*epsPG(k) && resDnormG(k) <10*epsDG(k)
+            admm.penaltyAdjust = false;         %% 在收敛误差附近，停止修改惩罚系数，避免震荡
+        end
+    end
+    if Osch.start
+        % 检测震荡，发生震荡时，减少admm.mu，减弱修改惩罚系数的条件
+        if k==1
+            Osch.centre = [resPnormG(k),resDnormG(k)];
+        end
+        if ( Osch.centre(1)/Osch.rang < resPnormG(k) &&  resPnormG(k) < Osch.rang*Osch.centre(1) &&...
+                Osch.centre(2)/Osch.rang < resDnormG(k) && resDnormG(k)< Osch.rang*Osch.centre(2))
+            Osch.centre = [mean(resPnormG(k-Osch.iter:k)),mean(resDnormG(k-Osch.iter :k))];
+            Osch.iter = Osch.iter+1;
+        else
+            Osch.centre = [resPnormG(k),resDnormG(k)];
+            Osch.iter = 0;
+        end
+        if Osch.iter >= Osch.maxIter
+             admm.mu = admm.mu /2;
+             Osch.iter = 0;
         end
     end
     disp(['第' num2str(k) '次迭代:' num2str(toc) 's']);
