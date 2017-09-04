@@ -3,10 +3,12 @@
 %                     absolut tolerance 
 clear all;
 delete(gcp());
-matFile = {'data\case12\areadata1.mat', 'data\case12\areadata2.mat'};
-resultFile ='data\case12\decentralized_result.mat';
-A=2;       % number of area 
+matFile = {'data\case118\areadata1.mat', 'data\case118\areadata2.mat','data\case118\areadata3.mat'};
+resultFile ='data\case118\decentralized_result.mat';
+A=3;       % number of area 
 T=24;
+isStep = true;
+isPlot = true;
 
 NtieC    = cell(A,1);
 TieAreaC = cell(A,1);
@@ -16,11 +18,11 @@ ftie_outC= cell(A,1);
 ftie_avgC= cell(A,1);
 %-------------- admm struct -----------------------
 admm.Converge = false;
-admm.MAX_ITER = 100;
+admm.MAX_ITER = 200;
 admm.Iteration=0;
 admm.ABSTOL   = 0.05;
 admm.RELTOL   = 1e-2;
-admm.Rho      = 3.5;
+admm.Rho      = 16.8;
 admm.penaltyAdjust = 1;    %% 0-不调整惩罚系数Rho， 1-调整惩罚系数
 admm.tau = 2;              %% 惩罚系数调整的相关系数 >1
 admm.mu  = 10;             %% 惩罚系数调整的相关系数 >1   
@@ -32,16 +34,18 @@ admm.gamma = 1.618;  %1.618;   %% lamada乘子更新系数 取值范围[0,(1+sqrt(5)/2)]
 
 %------------- accelerate method ------------------
 accelerate_mode = true;
-insens_times = 2;                  %% 机组状态变化不灵敏判断次数 >=2
+insens_times = 3;                  %% 机组状态变化不灵敏判断次数 >=2
 MIPGap       = 0.005;
 %------------- accelerate method ------------------
 %------------- oscillating handle ------------------
 Osch.start = false;
 Osch.centre = 0;
 Osch.rang = sqrt(20);
-Osch.maxIter = 10;
+Osch.maxIter = 20;
 Osch.iter = 0;
 %------------- oscillating handle------------------
+%------------- history information ----------------
+hsit.Rho(1)=admm.Rho;
 parpool(A);
 %-------------- plot -------------------
 % figure(1)
@@ -256,10 +260,41 @@ for k= 1:MAX_ITER
             Osch.iter = 0;
         end
         if Osch.iter >= Osch.maxIter
-             admm.mu = admm.mu /2;
+%              admm.mu = admm.mu /1.618;
+%              Rho = Rho + 2*(rand(1)-0.5);
+             Rho = Rho *10^((resPnormG(k)/resDnormG(k)-0.1)/9.9)/sqrt(10);
+             admm.penaltyAdjust = true;
              Osch.iter = 0;
         end
     end
+    hist.Rho(k) = Rho;
+    if isStep == true
+        if k==1
+            figure;
+            rplot = subplot(2,1,1);                                                                                                                    
+            semilogy(rplot,1:k, max(1e-8, resPnormG), 'k',1:k, epsPG, 'k--',1:k, hist.Rho, 'k-.',  'LineWidth', 2); 
+            ylabel('primal residual'); 
+            axis([1 admm.MAX_ITER 10e-3 10e5]);
+            grid on;
+            hold (rplot,'off'); 
+            dplot = subplot(2,1,2);                                                                                                                    
+            semilogy(dplot,1:k, max(1e-8, resDnormG), 'k',1:k, epsDG, 'k--',1:k, hist.Rho, 'k-.', 'LineWidth', 2);   
+            ylabel('dual residual'); xlabel('iter (k)');
+            axis([1 admm.MAX_ITER 10e-3 10e5]);
+            grid on
+            hold (dplot,'off'); 
+        else 
+            hold (rplot,'on');                                                                                                                    
+            semilogy(rplot,1:k, max(1e-8, resPnormG), 'k',1:k, epsPG, 'k--',1:k, hist.Rho, 'k-.',  'LineWidth', 2); 
+            drawnow;
+            hold (rplot,'off'); 
+            hold (dplot,'on');                                                                                                                    
+            semilogy(dplot,1:k, max(1e-8, resDnormG), 'k',1:k, epsDG, 'k--',1:k, hist.Rho, 'k-.', 'LineWidth', 2);  
+            drawnow;
+            hold (dplot,'off'); 
+%             pause(0.05);
+        end
+    end    
     disp(['第' num2str(k) '次迭代:' num2str(toc) 's']);
 end
 admm.Rho = Rho;
@@ -296,15 +331,16 @@ else
     save(resultFile ,'admm');
 end
 %% display error
-isPlot = true;
 if isPlot
     glog = figure;
     subplot(2,1,1);                                                                                                                    
     semilogy(1:k, max(1e-8, resPnormG), 'k',1:k, epsPG, 'k--',  'LineWidth', 2); 
     ylabel('primal residual'); 
+    grid on;
     subplot(2,1,2);                                                                                                                    
     semilogy(1:k, max(1e-8, resDnormG), 'k',1:k, epsDG, 'k--', 'LineWidth', 2);   
     ylabel('dual residual'); xlabel('iter (k)');
+    grid on;
     
     g = figure;
     subplot(2,1,1);                                                                                                                    
