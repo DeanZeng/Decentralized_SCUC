@@ -1,4 +1,4 @@
-function [out,ftie_out,iu] = scuc_accelerateSolve(model,ftie_avg,lamda,Rho,iu,MIPGap)
+function [out,ftie_out,iu,model] = scuc_accelerateSolve(model,ftie_avg,lamda,Rho,iu,MIPGap)
 if nargin <= 5
     MIPGap = 0.005;
 end
